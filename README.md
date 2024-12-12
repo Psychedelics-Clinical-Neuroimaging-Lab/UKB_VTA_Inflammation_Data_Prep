@@ -1,7 +1,6 @@
 # VTA_UKB_Inflammation_Paper
 
 ## Overview
-## Data Analysis and Visualization for Neuroimaging Biomarkers
 This repository contains two scripts designed for processing, analyzing, and visualizing neuroimaging biomarkers and clinical measures related to depression severity. The analysis leverages advanced statistical methods and data visualization techniques to explore relationships between brain structure, inflammation markers, and depressive symptomatology.
 
 ---
