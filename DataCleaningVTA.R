@@ -142,7 +142,8 @@ fieldsVTA <- fieldsVTA %>%
     Date_COVID_Ques_2022 = f.28755.0.0,
     Nb_Depression_Episodes_2 = f.4620.2.0,Longest_period_of_depression_2 = f.4609.2.0,
     Nb_Disinterest_Episodes_2 = f.5386.2.0,Longest_period_of_Disinterest_2 = f.5375.2.0,
-    Seen_GP_Nerves_Depression_2 = f.2090.2.0,Seen_Psychiatrist_Nerves_Depression_2 = f.2100.2.0
+    Seen_GP_Nerves_Depression_2 = f.2090.2.0,Seen_Psychiatrist_Nerves_Depression_2 = f.2100.2.0,
+    
   )
 
 # -----------------------------------
@@ -425,3 +426,4 @@ average_RDS_negative_ICD <- mean(negative_ICD_history$RDS_2, na.rm = TRUE)
 cat("Average RDS value for subjects with a history of depression in ICD:", round(average_RDS_positive_ICD, 2), "\n")
 cat("Average RDS value for subjects with NO HISTORY:", round(average_RDS_negative_ICD, 2), "\n")
 # -----------------------------------
+

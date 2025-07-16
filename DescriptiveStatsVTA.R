@@ -40,7 +40,11 @@ library(GGally)
 library(tidyverse)
 library(car)
 library(kableExtra)
-library(officer)   # Exporting tables to word  
+library(officer)   # Exporting tables to word 
+library(QuantPsyc)
+library(ggExtra)
+
+
 
 # -----------------------------------
 
@@ -237,7 +241,7 @@ for (i in 1:nrow(frequency_summary)) {
   print(value_percent)
 }
 
-# Descriptive stats were computed for the depressed group. This was done to see if we needed to do any follow up analyses other than our hypothes
+# Descriptive stats were computed for the depressed group. This was done to see if we needed to do any follow up analyses other than our hypothesis
 
 # -----------------------------------
 # Analysis 1: Group Comparisons: ANOVAs-- Resampling of HC based on MDD group
@@ -745,8 +749,14 @@ cat("Best Sex Ratio (Male):", best_sex_ratio, "\n")
 LinearRegressionMDDbest_match_df <- best_match[, c("Sex", "Age_2", "AgeSquared", "BMI_2", "RDS_2", 
                                                    "VTA_ICVF", "VTA_ISOVF", "VTA_OD", 
                                                    "VTA_QSM_normalized", "VTA_Volume_Normalized")]
+
+LinearRegressionMDDbest_match_df$Sex <- as.numeric(LinearRegressionMDDbest_match_df$Sex)  # Converts factor to numeric levels
+
 LinearRegressionMDDbest_match <- lm(RDS_2 ~ ., data = LinearRegressionMDDbest_match_df)
 summary(LinearRegressionMDDbest_match)
+
+# Run lm.beta to get standardized beta coefficients
+standardized_betas <- lm.beta(LinearRegressionMDDbest_match)
 
 # Calculate VIF and report
 vif_values_LinearRegressionMDDbest_match <- vif(LinearRegressionMDDbest_match)
@@ -754,6 +764,162 @@ print(vif_values_LinearRegressionMDDbest_match)
 
 # Compute 95% confidence intervals
 confint(LinearRegressionMDDbest_match, level = 0.95)
+
+###########################################################
+# Step 6: Predicted vs Observed Plot
+###########################################################
+
+# Load required libraries
+library(ggplot2)
+library(ggExtra)
+
+# Get predicted values from the model
+LinearRegressionMDDbest_match_df$Predicted_RDS_2 <- predict(LinearRegressionMDDbest_match, newdata = LinearRegressionMDDbest_match_df)
+
+# Extract numeric vectors for plotting
+X <- LinearRegressionMDDbest_match_df$Predicted_RDS_2
+Y <- LinearRegressionMDDbest_match_df$RDS_2
+
+# Compute correlation and standard deviations
+r_value <- cor(X, Y)   # Pearson correlation
+sdX <- sd(X)           # Standard deviation of Predicted RDS
+sdY <- sd(Y)           # Standard deviation of Observed RDS
+
+# Create annotation text with correlation and standard deviations
+annotation_text <- paste0(
+  "r = ", round(r_value, 3), "\n",
+  "σ(Predicted) = ", round(sdX, 3), "\n",
+  "σ(Observed) = ", round(sdY, 3)
+)
+
+# Base scatter plot
+p <- ggplot(LinearRegressionMDDbest_match_df, 
+            aes(x = Predicted_RDS_2, y = RDS_2)) +
+  geom_point(color = "#6b95c4", alpha = 0.6) +            # Scatter plot
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "black") +  # Identity line (y = x)
+  #geom_smooth(method = "lm", formula = y ~ x, color = "red", se = TRUE) +  # Best-fit regression line
+  coord_cartesian(xlim = c(4, 16), ylim = c(4, 16)) +  # Zoom without cropping data
+  labs(
+    title = "Predicted vs. Observed Depression Severity 
+    (Old Model)",
+    x = "Predicted RDS",
+    y = "Observed RDS"
+  ) +
+  theme_minimal(base_size = 13) +  # Apply a clean theme
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 18, face = "bold"),  # Centered title
+    axis.title = element_text(size = 16),  # Axis labels
+    axis.title.x = element_text(size = 14, face = "bold"),  # Increase x-axis title size
+    axis.title.y = element_text(size = 14, face = "bold"),  # Increase y-axis title size
+    plot.margin = margin(t = 40, r = 10, b = 10, l = 10)  # Add extra spacing at the top
+    
+  ) +
+  annotate(
+    "text",
+    x = 3.5,    # Move further left
+    y = 16.25, # Upper part of the graph
+    label = annotation_text,
+    hjust = 0,  # Left-align text
+    vjust = 1,  # Top-align text
+    size = 4.5,
+    color = "black"
+  )
+
+# Add marginal density or histogram plots
+p_with_marginals <- ggMarginal(
+  p,
+  type = "density",  # Change to "histogram" for histogram instead of density
+  fill = "#6b95c4", 
+  alpha = 1
+)
+
+# Render the plot with marginal distributions
+print(p_with_marginals)
+
+
+###########################################################
+# Step 7: Beta Estimates 
+###########################################################
+# Load necessary libraries
+library(ggplot2)
+library(broom)
+library(dplyr)
+
+# Step 1: Remove Predicted_RDS_2 if it exists
+LinearRegressionMDDbest_match_df <- LinearRegressionMDDbest_match_df %>% 
+  select(-Predicted_RDS_2)
+
+# Step 2: Standardize predictors (excluding RDS_2)
+predictors <- LinearRegressionMDDbest_match_df %>% select(-RDS_2)
+predictors_standardized <- as.data.frame(scale(predictors))
+
+# Keep dependent variable (RDS_2) in original scale
+LinearRegressionMDDbest_match_standardized <- cbind(
+  RDS_2 = LinearRegressionMDDbest_match_df$RDS_2, 
+  predictors_standardized
+)
+
+# Step 3: Fit standardized regression model
+model_standardized <- lm(RDS_2 ~ ., data = LinearRegressionMDDbest_match_standardized)
+
+# Step 4: Extract coefficients & confidence intervals
+coef_df_standardized <- broom::tidy(model_standardized, conf.int = TRUE) %>%
+  rename(Term = term, Beta = estimate, CI_low = conf.low, CI_high = conf.high, p_value = p.value) %>%
+  filter(Term != "(Intercept)") %>%
+  arrange(desc(Beta))  # Sort by effect size
+
+# Step 5: Rename variables for the y-axis
+coef_df_standardized$Term <- factor(
+  coef_df_standardized$Term,
+  levels = coef_df_standardized$Term,  # Maintain order
+  labels = c("ODI", "BMI", "ICVF", "Normalized QSM", "Age²", 
+             "Volume Ratio", "ISOVF", "Sex", "Age")
+)
+
+# Step 6: Create the improved Beta Coefficient Plot
+ggplot(coef_df_standardized, aes(x = reorder(Term, Beta), y = Beta, fill = Beta > 0)) +
+  
+  # Bar plot for beta coefficients
+  geom_col(show.legend = FALSE, width = 0.6) +
+  
+  # Confidence intervals (error bars)
+  geom_errorbar(aes(ymin = CI_low, ymax = CI_high), width = 0.2, color = "black", linewidth = 0.8) +
+  
+  # Dashed zero-reference line
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black", linewidth = 0.8) +
+  
+  # Improved labels & theme
+  labs(
+    title = "Standardized Beta Coefficients for Depression Severity\n",
+    subtitle = "Predictors with 95% Confidence Intervals",
+    x = "Predictors",
+    y = "Standardized Beta Coefficient"
+  ) +
+  
+  # Updated color scheme: Grey (negative), Blue (positive)
+  scale_fill_manual(values = c("#808080", "#377EB8")) +  # Grey for negative, Blue for positive
+  
+  # Theme for a clean, publication-ready look with adjusted font sizes
+  theme_minimal(base_size = 16) +  # Increases the overall text size slightly
+  
+  # Customize text & axis elements
+  theme(
+    plot.title = element_text(face = "bold", size = 16, hjust = 1),  # Shift title to the left
+    plot.subtitle = element_text(size = 14, hjust = 0.7),  # Keep subtitle aligned with title
+    axis.title.x = element_text(size = 14, face = "bold"),  # Increase x-axis title size
+    axis.title.y = element_text(size = 15, face = "bold"),  # Increase y-axis title size
+    axis.text.x = element_text(size = 16),  # Increase x-axis text
+    axis.text.y = element_text(size = 12),  # Increase y-axis text (slightly smaller than x-axis)
+    plot.margin = margin(t = 20, r = 10, b = 10, l = 10),  # Add extra spacing at the top
+    panel.grid.major = element_line(color = "grey90"),
+    panel.grid.minor = element_blank()
+  ) +
+  
+  # Flip coordinates for readability
+  coord_flip()
+
+# Step 7: Display extracted values in descending order
+print(coef_df_standardized)
 
 ####################
 # -----------------------------------
@@ -781,7 +947,8 @@ ggpairs(InflammationVariables_best_match, columns = 1:9,
         axis.title = element_text(size = 5),
         plot.title = element_text(size = 10, face = "bold", hjust = 0.5))
 
-# -----------------------------------
+# Not used in paper
+#-----------------------------------
 # Computing the average duration between ICD diagnosis and scan
 # -----------------------------------
 # Filter data to exclude rows with NA in Date_F32, Date_F33, or Date_Assess_Center_2
@@ -1077,3 +1244,415 @@ doc <- body_add_table(doc, value = summary_table2, style = "Normal")
 
 # Save the Word document
 print(doc, target = "~/Desktop/dataVTA/Table_2.docx")
+
+# ################################################### Supplementary Table 1
+# Load necessary libraries
+library(dplyr)
+library(kableExtra)
+
+# Ensure p-values are formatted with scientific notation where needed
+coef_df_standardized <- coef_df_standardized %>%
+  mutate(p_value = ifelse(p_value < 0.001, formatC(p_value, format = "e", digits = 2), round(p_value, 4))) %>%
+  mutate(p_value = ifelse(as.numeric(gsub("\\*","",p_value)) < 0.05, paste0("**", p_value, "**"), p_value)) # Bold p-values < 0.05
+
+# Create a publication-ready table
+kable(coef_df_standardized, format = "html", digits = 3,
+      col.names = c("Predictor", "Beta Coeff.", "Std. Error", "t-Statistic", "p-Value", "95% CI (Lower)", "95% CI (Upper)")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"),
+                full_width = FALSE, font_size = 14) %>%
+  column_spec(2:7, width = "10em") %>%
+  row_spec(0, bold = TRUE) %>%
+  footnote(general = "Standardized beta coefficients predicting depression severity (RDS_2). Significant predictors (p < 0.05) are highlighted.")
+##################################################
+
+#Reviewer requested analyses
+
+###########################################################
+# 0. Load Required Libraries
+###########################################################
+library(ggplot2)
+library(broom)
+library(dplyr)
+library(ggExtra)
+
+###########################################################
+# 1. Data Preparation: Add Depression Variables
+###########################################################
+# Replace NAs with 0 and log-transform chronicity
+best_match$Nb_Depression_Episodes_2[is.na(best_match$Nb_Depression_Episodes_2)] <- 0
+best_match$Longest_period_of_depression_2[is.na(best_match$Longest_period_of_depression_2)] <- 0
+
+# Cap values at 100
+best_match$Nb_Depression_Episodes_2 <- pmin(best_match$Nb_Depression_Episodes_2, 100)
+best_match$Longest_period_of_depression_2 <- pmin(best_match$Longest_period_of_depression_2, 100)
+
+best_match$log_Nb_Depression_Episodes <- log1p(best_match$Nb_Depression_Episodes_2)
+best_match$log_Longest_Depression <- log1p(best_match$Longest_period_of_depression_2)
+
+# Create regression dataset
+LinearRegressionMDD_extended_df <- best_match[, c(
+  "Sex", "Age_2", "AgeSquared", "BMI_2", "RDS_2",
+  "VTA_ICVF", "VTA_ISOVF", "VTA_OD", 
+  "VTA_QSM_normalized",
+  "log_Nb_Depression_Episodes", "log_Longest_Depression"
+)]
+# Create regression dataset
+LinearRegressionMDD_extended_df_Volume <- best_match[, c(
+  "Sex", "Age_2", "AgeSquared", "BMI_2", "RDS_2",
+  "VTA_ICVF", "VTA_ISOVF", "VTA_OD", "VTA_Volume_Normalized",
+  "VTA_QSM_normalized",
+  "log_Nb_Depression_Episodes", "log_Longest_Depression"
+)]
+LinearRegressionMDD_extended_df$Sex <- as.numeric(LinearRegressionMDD_extended_df$Sex)
+LinearRegressionMDD_extended_df_Volume$Sex <- as.numeric(LinearRegressionMDD_extended_df_Volume$Sex)
+
+###########################################################
+# 2. Linear Model: Full Regression
+###########################################################
+model_extended <- lm(RDS_2 ~ ., data = LinearRegressionMDD_extended_df)
+summary(model_extended)
+
+model_extended_volume <- lm(RDS_2 ~ ., data = LinearRegressionMDD_extended_df_Volume)
+summary(model_extended_volume)
+###########################################################
+# 3. Predicted vs Observed Plot (Extended Model)
+###########################################################
+# Get predictions
+LinearRegressionMDD_extended_df$Predicted_RDS_2 <- predict(model_extended, newdata = LinearRegressionMDD_extended_df)
+
+# Compute correlation and SDs
+X <- LinearRegressionMDD_extended_df$Predicted_RDS_2
+Y <- LinearRegressionMDD_extended_df$RDS_2
+r_value <- cor(X, Y)
+sdX <- sd(X)
+sdY <- sd(Y)
+
+# Create annotation
+annotation_text <- paste0(
+  "r = ", round(r_value, 3), "\n",
+  "σ(Predicted) = ", round(sdX, 3), "\n",
+  "σ(Observed) = ", round(sdY, 3)
+)
+
+# Base plot
+p_updated <- ggplot(LinearRegressionMDD_extended_df, 
+            aes(x = Predicted_RDS_2, y = RDS_2)) +
+  geom_point(color = "#6b95c4", alpha = 0.6) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "black") +
+  coord_cartesian(xlim = c(4, 16), ylim = c(4, 16)) +
+  labs(
+    title = "     Predicted vs. Observed Depression Severity    ",
+    x = "Predicted RDS",
+    y = "Observed RDS"
+  ) +
+  theme_minimal(base_size = 20) +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 18, face = "bold"),
+    axis.title = element_text(size = 16),
+    axis.title.x = element_text(size = 14, face = "bold"),
+    axis.title.y = element_text(size = 14, face = "bold"),
+    plot.margin = margin(t = 40, r = 10, b = 10, l = 10)
+  ) +
+  annotate(
+    "text", x = 3.5, y = 16.25, label = annotation_text,
+    hjust = 0, vjust = 1, size = 4.75, color = "black"
+  )
+
+# Add marginal distributions
+p_with_marginals_updated <- ggMarginal(
+  p_updated, type = "density", fill = "#6b95c4", alpha = 1
+)
+print(p_with_marginals_updated)
+
+###########################################################
+# 4. Standardized Beta Coefficient Plot
+###########################################################
+
+# Standardize predictors (excluding RDS_2)
+predictors <- dplyr::select(LinearRegressionMDD_extended_df, -RDS_2)
+predictors <- dplyr::select(LinearRegressionMDD_extended_df, -Predicted_RDS_2)
+predictors_standardized <- as.data.frame(scale(predictors))
+
+# Recombine with outcome
+LinearRegressionMDD_standardized <- cbind(
+  RDS_2 = LinearRegressionMDD_extended_df$RDS_2,
+  predictors_standardized
+)
+
+# Fit standardized model
+model_standardized <- lm(RDS_2 ~ ., data = LinearRegressionMDD_standardized)
+summary(model_standardized)
+
+# Step 1: After extracting and sorting coefficients
+coef_df_standardized_updated <- broom::tidy(model_standardized, conf.int = TRUE) %>%
+  rename(Term = term, Beta = estimate, CI_low = conf.low, CI_high = conf.high, p_value = p.value) %>%
+  filter(Term != "(Intercept)") %>%
+  arrange(desc(Beta))  # or use arrange(abs(Beta), .by_group = TRUE) for abs sorting
+
+# Step 2: Assign correct factor levels for plotting
+# First, ensure the actual variable names match the order in `coef_df_standardized$Term`
+# This vector MUST match the actual variable names from the model:
+coef_df_standardized_updated$Term <- factor(
+  coef_df_standardized_updated$Term,
+  levels = c(
+    "log_Nb_Depression_Episodes",
+    "log_Longest_Depression",
+    "VTA_OD",
+    "VTA_ICVF",
+    "BMI_2",
+    "VTA_ISOVF",
+    "Sex",
+    "Age_2",
+    "AgeSquared",
+    "VTA_QSM_normalized"
+  ),
+  labels = c(
+    "Number of Depressive 
+    Episodes (Lifetime)",
+    "Longest Depressive 
+    Episode (Weeks)",
+    "ODI",
+    "ICVF",
+    "BMI",
+    "ISOVF",
+    "Sex",
+    "Age",
+    "Age²",
+    "Normalized QSM"
+  )
+)
+
+# Plot
+ggplot(coef_df_standardized_updated, aes(x = reorder(Term, Beta), y = Beta, fill = Beta > 0)) +
+  geom_col(show.legend = FALSE, width = 0.6) +
+  geom_errorbar(aes(ymin = CI_low, ymax = CI_high), width = 0.2, color = "black", linewidth = 0.8) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black", linewidth = 0.8) +
+  labs(
+    title = "Standardized Beta Coefficients\nPredicting Depression Severity",
+    subtitle = "Predictors with \n 95% Confidence Intervals",
+    x = "Predictors",
+    y = "Standardized Beta Coefficients"
+  ) +
+  scale_fill_manual(values = c("#808080", "#377EB8")) +
+  theme_minimal(base_size = 16) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16, hjust = 1),
+    plot.subtitle = element_text(size = 14, hjust = 0.7),
+    axis.title.x = element_text(size = 14, face = "bold"),
+    axis.title.y = element_text(size = 15, face = "bold"),
+    axis.text.x = element_text(size = 16),
+    axis.text.y = element_text(size = 12),
+    plot.margin = margin(t = 20, r = 10, b = 10, l = 10),
+    panel.grid.major = element_line(color = "grey90"),
+    panel.grid.minor = element_blank()
+  ) +
+  coord_flip()
+
+####Print extracted standardized coefficients
+print(coef_df_standardized_updated)
+#####################################
+## MDD hisotry + current symptom severity
+library(ggplot2)
+
+# Step 1: Make sure ICD_Depression is a factor with readable labels
+best_match$ICD_Depression <- factor(
+  best_match$ICD_Depression,
+  levels = c(0, 1),
+  labels = c("Healthy Controls", "MDD History")
+)
+
+# Step 2: Create side-by-side histogram
+ggplot(best_match, aes(x = RDS_2, fill = ICD_Depression)) +
+  geom_histogram(position = "dodge", bins = 20, color = "white", alpha = 0.8) +
+  scale_fill_manual(values = c("Healthy Controls" = "seagreen3", "MDD History" = "steelblue")) +
+  labs(
+    title = "Distribution of RDS_2 Scores by Depression History",
+    x = "RDS_2 Score",
+    y = "Number of Participants",
+    fill = "Group"
+  ) +
+  theme_minimal()
+
+###"Severity of Depression"
+#Prepare the variables (replace NA with 0)
+best_match$Nb_Depression_Episodes_2[is.na(best_match$Nb_Depression_Episodes_2)] <- 0
+best_match$Longest_period_of_depression_2[is.na(best_match$Longest_period_of_depression_2)] <- 0
+
+#Step 2: Create frequency tables
+episodes_table <- as.data.frame(table(best_match$Nb_Depression_Episodes_2))
+colnames(episodes_table) <- c("Number of Episodes", "Frequency")
+
+duration_table <- as.data.frame(table(best_match$Longest_period_of_depression_2))
+colnames(duration_table) <- c("Longest Period (weeks)", "Frequency")
+
+# Format tables for publishing (e.g., gt or knitr::kable)
+
+library(knitr)
+
+kable(episodes_table, caption = "Frequency of Depression Episodes")
+kable(duration_table, caption = "Frequency of Longest Depressive Period (Months)")
+
+library(ggplot2)
+
+# Replace NA with 0 as before
+best_match$Nb_Depression_Episodes_2[is.na(best_match$Nb_Depression_Episodes_2)] <- 0
+best_match$Longest_period_of_depression_2[is.na(best_match$Longest_period_of_depression_2)] <- 0
+
+# Create frequency tables
+episodes_freq <- as.data.frame(table(best_match$Nb_Depression_Episodes_2))
+colnames(episodes_freq) <- c("Episodes", "Frequency")
+episodes_freq$Episodes <- as.numeric(as.character(episodes_freq$Episodes))
+
+
+duration_freq <- as.data.frame(table(best_match$Longest_period_of_depression_2))
+colnames(duration_freq) <- c("DurationMonths", "Frequency")
+duration_freq$DurationMonths <- as.numeric(as.character(duration_freq$DurationMonths))
+
+####################################
+######################## Model with Volume for reviewer - computing the CI and such
+#####################################
+library(dplyr)
+library(broom)
+
+# Select predictors and standardize them (excluding RDS_2)
+predictors_volume <- LinearRegressionMDD_extended_df_Volume %>% select(-RDS_2)
+predictors_volume_scaled <- as.data.frame(scale(predictors_volume))
+
+# Recombine with the outcome variable
+LinearRegressionMDD_standardized_volume <- cbind(
+  RDS_2 = LinearRegressionMDD_extended_df_Volume$RDS_2,
+  predictors_volume_scaled
+)
+
+# Fit standardized model
+model_standardized_volume <- lm(RDS_2 ~ ., data = LinearRegressionMDD_standardized_volume)
+
+coef_df_standardized_volume <- broom::tidy(model_standardized_volume, conf.int = TRUE) %>%
+  filter(term != "(Intercept)") %>%
+  mutate(
+    `β (Standardized Coefficient)` = round(estimate, 3),
+    `95% CI` = paste0("[", round(conf.low, 3), ", ", round(conf.high, 3), "]"),
+    `p-value` = case_when(
+      p.value < 0.001 ~ "<0.001***",
+      p.value < 0.01  ~ paste0(round(p.value, 3), "**"),
+      p.value < 0.05  ~ paste0(round(p.value, 3), "*"),
+      TRUE            ~ as.character(round(p.value, 3))
+    )
+  ) %>%
+  select(Predictor = term, 
+         `β (Standardized Coefficient)`, 
+         `95% CI`, 
+         `p-value`) %>%
+  arrange(desc(`β (Standardized Coefficient)`))
+
+### Recode and clean up the variables
+coef_df_standardized_volume$Predictor <- recode(coef_df_standardized_volume$Predictor,
+                                                "log_Nb_Depression_Episodes" = "Number of Depressive Episodes (Lifetime)",
+                                                "log_Longest_Depression" = "Longest Depressive Episode (Weeks)",
+                                                "VTA_OD" = "ODI",
+                                                "VTA_ICVF" = "ICVF",
+                                                "VTA_ISOVF" = "ISOVF",
+                                                "VTA_QSM_normalized" = "Normalized QSM",
+                                                "VTA_Volume_Normalized" = "VTA Volume Ratio",
+                                                "BMI_2" = "BMI",
+                                                "Age_2" = "Age",
+                                                "AgeSquared" = "Age²",
+                                                "Sex" = "Sex"
+)
+
+
+### make into a table 
+library(knitr)
+library(dplyr) 
+
+kable(coef_df_standardized_volume, digits = 3,
+      caption = "Table S1. Standardized Beta Coefficients from Original Linear Regression Model Including VTA Volume")
+
+#
+
+################
+#########
+#################
+
+library(officer)
+library(flextable)
+
+# Convert to flextable (prettier than base Word table)
+ft <- flextable(coef_df_standardized_volume)
+ft <- set_caption(ft, caption = "Table S1. Standardized Beta Coefficients from Original Linear Regression Model Including VTA Volume")
+ft <- autofit(ft)
+
+# Create Word doc and add the table
+doc <- read_docx()
+doc <- body_add_par(doc, "Table S1", style = "heading 1")
+doc <- body_add_par(doc, "Standardized Beta Coefficients from Original Linear Regression Model Including VTA Volume", style = "Normal")
+doc <- body_add_flextable(doc, ft)
+
+# Save
+print(doc, target = "~/Desktop/dataVTA/Standardized_Betas_TableS1.docx")
+
+##################
+#########Exporting it as an image
+#################
+##################Adding linear regression stats
+# Get model summary
+model_summary <- summary(model_standardized_volume)
+
+# Extract values
+r_squared      <- round(model_summary$r.squared, 3)
+adj_r_squared  <- round(model_summary$adj.r.squared, 3)
+f_statistic    <- round(model_summary$fstatistic[1], 2)
+df1            <- model_summary$fstatistic[2]  # numerator df
+df2            <- model_summary$fstatistic[3]  # denominator df
+
+# reporting these values in figure 
+note_line <- paste0("Note: Model R² = ", r_squared,
+", Adjusted R² = ", adj_r_squared,
+", F(", df1, ", ", df2, ") = ", f_statistic, ", p < 0.001.")
+
+
+library(flextable)
+library(webshot2)
+
+# Define the alternating background color
+zebra_grey <- "#F7F7F7"
+
+# Build formatted flextable
+ft <- flextable(coef_df_standardized_volume) %>%
+  autofit() %>%
+  fontsize(size = 11, part = "all") %>%
+  
+  # Clean and minimal theme
+  theme_booktabs() %>%
+  
+  # Align columns
+  align(j = "Predictor", align = "left", part = "all") %>%
+  align(j = "β (Standardized Coefficient)", align = "center", part = "all") %>%
+  align(j = "95% CI", align = "center", part = "all") %>%
+  align(j = "p-value", align = "left", part = "all") %>%
+  
+  # Italicize β and p in headers only
+  compose(part = "header", j = "β (Standardized Coefficient)",
+          value = as_paragraph(as_i("β"), " (Standardized Coefficient)")) %>%
+  compose(part = "header", j = "p-value",
+          value = as_paragraph(as_i("p"), "-value")) %>%
+  
+  # Apply alternating grey background to even-numbered rows
+  bg(i = seq(2, nrow(coef_df_standardized_volume), by = 2),
+     bg = zebra_grey, part = "body")
+  
+# Show it
+ft
+
+##### adding the captions and so on 
+ft <- ft %>%
+  add_footer_lines(values = c(
+    "Table S4. Standardized beta coefficients from original linear regression model including VTA volume. VTA volume was later removed from the final model due to concerns about atlas-based volume estimation (see main text for revised model).The outcome variable was recent depressive symptom severity (RDS) and significant predictors are indicated with asterisks: ***p < .001, **p < .01, *p < .05.",
+    "",
+    note_line  )) %>%
+  fontsize(size = 10, part = "footer") %>%
+  align(align = "left", part = "footer")
+
+ft
+# Save as image
+save_as_image(ft, path = "~/Desktop/dataVTA/Standardized_Betas_Table_Volume_screenshot.png", zoom = 2)
