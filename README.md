@@ -26,6 +26,9 @@ This script performs statistical analyses and generates visualizations for the d
 3. Conduct ANOVA and linear regression analyses to assess the effects of neuroimaging biomarkers on depressive symptoms.
 4. Save publication-ready tables and visualizations.
 
+### 3. **VTA_Supp_Material_ROI_analysis.R**
+This script looks at the metrics in different ROIs implicated in depression and updates the regression model. These updates are part of the reviewers suggestions. 
+
 ### **Side note**
 
 Figure 2 (subject T1 with VTA atlas) was visualized by using fsleyes 
