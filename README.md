@@ -31,8 +31,6 @@ This script focuses on preparing and cleaning the dataset for further analysis. 
 - Preprocessing steps to calculate derived variables such as normalized volumes and free-water maps.
 - Handling missing data and generating descriptive statistics.
 
----
-
 ### 2. **DescriptiveStatsVTA.R**
 This script performs statistical analyses and generates visualizations for the dataset prepared in the first script.
 
@@ -47,6 +45,7 @@ This script performs statistical analyses and generates visualizations for the d
 ### 3. **VTA_Supp_Material_ROI_analysis.R**
 This script looks at the metrics in different ROIs implicated in depression and updates the regression model. These updates are part of the reviewers suggestions. 
 
+---
 ### **Side note**
 
 Figure 2 (subject T1 with VTA atlas) was visualized by using fsleyes 
