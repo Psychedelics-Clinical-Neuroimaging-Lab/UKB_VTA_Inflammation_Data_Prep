@@ -1,7 +1,7 @@
 # VTA_UKB_Inflammation_Paper
 
 ## Overview
-This repository contains two scripts designed for processing, analyzing, and visualizing neuroimaging biomarkers and clinical measures related to depression severity. The analysis explores relationships between brain structure, inflammation markers, and depressive symptomatology in the UKB by using diffusion MRI and Quantitative Susceptibility Mapping.
+This repository contains four scripts designed for processing, analyzing, and visualizing neuroimaging biomarkers and clinical measures related to depression severity. The analysis explores relationships between brain structure, inflammation markers, and depressive symptomatology in the UKB by using diffusion MRI and Quantitative Susceptibility Mapping.
 
 ---
 
