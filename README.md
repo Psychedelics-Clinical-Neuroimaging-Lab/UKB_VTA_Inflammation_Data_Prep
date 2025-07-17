@@ -14,7 +14,7 @@ Quality Control: Logs missing files in MissingFilesReport.txt and removes incomp
 Runs in parallel using SLURM array jobs across subject batch folders (e.g., 46100, 46200, ...).
 Produces clean, standardized subject directories ready for DWI metric extraction.
 
-### 2. **MNI2DWI_ROIs_T1**
+### 2. **MNI2DWI_ROIs_T1.slurm**
 This script warps ROIs from MNI space to subject-specific T1 and DWI space, and extracts regional diffusion (ICVF, ISOVF, FW, OD) and QSM metrics. 
 To run the script assumes the following are in the HPC directory:
        - the required images (QSM,NODDI,FW,T1) 
