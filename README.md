@@ -3,6 +3,24 @@
 ## Overview
 This repository contains four scripts designed for processing, analyzing, and visualizing neuroimaging biomarkers and clinical measures related to depression severity. The analysis explores relationships between brain structure, inflammation markers, and depressive symptomatology in the UKB by using diffusion MRI and Quantitative Susceptibility Mapping.
 
+## Slurm scripts 
+### 1. **dwi-prep.slurm**
+DWI Preprocessing: Data Preparation Script -This is an example of the image prep pipeline. 
+This SLURM script prepares DWI subject folders for downstream analysis by automating three key steps:
+Unzipping: Extracts subject ZIP archives into individual folders.
+File Organization: Moves and renames required files (e.g., bvals, NODDI_ICVF.nii.gz) to each subject's root directory.
+Quality Control: Logs missing files in MissingFilesReport.txt and removes incomplete subjects or unnecessary subdirectories.
+
+Runs in parallel using SLURM array jobs across subject batch folders (e.g., 46100, 46200, ...).
+Produces clean, standardized subject directories ready for DWI metric extraction.
+
+### 2. **MNI2DWI_ROIs_T1**
+This script warps ROIs from MNI space to subject-specific T1 and DWI space, and extracts regional diffusion (ICVF, ISOVF, FW, OD) and QSM metrics. 
+To run the script assumes the following are in the HPC directory:
+       - the required images (QSM,NODDI,FW,T1) 
+       - Subject list array are in the directory before running this script
+       - ROIS list (ROIS=("VTA" "PAG" "LC" "DRN" "NTS")) #subcortical atlas automatically includes all these ROIs 
+
 ---
 
 ## R Scripts
